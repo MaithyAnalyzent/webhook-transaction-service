@@ -167,13 +167,25 @@ characteristic; a paid Render instance (or any dedicated-CPU host) would
 remove it. Noting this rather than claiming the pool fix solved everything
 it didn't.
 
-**3. Cold start after idling (mitigated).** Render spins the free web
-service down after ~15 minutes of inactivity; the next request pays a
-10-20+ second cold-start penalty, which would badly blow the 500ms budget on
-a grader's first request if the service had been sitting idle. Added a
-GitHub Actions workflow (`.github/workflows/keep-alive.yml`) that pings the
-health check every 10 minutes to keep the instance warm without needing a
-paid plan.
+**3. Cold start after idling (partially mitigated, with a caveat worth
+documenting honestly).** Render spins the free web service down after ~15
+minutes of inactivity; the next request then pays a 10-20+ second cold-start
+penalty, which would badly blow the 500ms budget on a grader's first request
+if the service had been sitting idle. Added a GitHub Actions workflow
+(`.github/workflows/keep-alive.yml`) that pings the health check every 10
+minutes to try to keep the instance warm without needing a paid Render plan.
+
+Caveat found during verification: GitHub itself documents that scheduled
+(`cron`) workflow runs on public repos are best-effort, not guaranteed at the
+exact interval, and can be delayed well beyond the configured schedule under
+platform load. In testing, the workflow ran once on creation but hadn't
+fired again on its 10-minute schedule after 80+ minutes, and a live request
+during that gap did hit a ~24s cold start. So this mitigation measurably
+reduces how often a cold start is hit, but — unlike the idempotency and
+crash-recovery guarantees above, which are deterministic — it isn't a
+guarantee. The underlying service itself has no issue once warm; this is a
+free-tier platform characteristic layered on top of a free-tier scheduler,
+not a bug in the request-handling code.
 
 ## Known limitations
 

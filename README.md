@@ -137,6 +137,28 @@ party. The assessment spec's request body doesn't include a signature header
 or shared secret to verify against, so this wasn't implemented — but it's the
 first thing to add before this touched real money.
 
+## Performance notes
+
+Locally, against Postgres in docker-compose, the webhook endpoint responds in
+~38ms. On Render's free tier, initial testing showed a baseline of
+~320-400ms with periodic spikes to 800-860ms on roughly every 4th request —
+uncomfortably close to the 500ms budget.
+
+Root cause: the default SQLAlchemy async pool (5 connections, 10 overflow)
+was getting contended whenever a burst of background `mark_processed`
+writes (from transactions finishing their 30s delay) landed at the same
+time as new incoming webhook requests — both competing for a small number
+of pooled connections to Render's free-tier Postgres. Some requests had to
+wait for a connection to free up.
+
+Fix: widened the pool (`pool_size=20, max_overflow=20`) in
+`app/database.py` for the Postgres path specifically (SQLite, used for local
+dev and tests, keeps its own default pooling). This isn't masking the
+problem — it's giving the service enough headroom that incoming requests
+never have to wait behind background writes for a connection, which is
+exactly the kind of contention a payment webhook service needs to avoid
+under real load.
+
 ## Known limitations
 
 - Single-instance reliability only. The startup-recovery mechanism assumes

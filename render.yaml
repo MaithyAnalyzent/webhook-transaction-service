@@ -1,0 +1,20 @@
+databases:
+  - name: webhook-transactions-db
+    plan: free
+    region: oregon
+
+services:
+  - type: web
+    name: webhook-transaction-service
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: webhook-transactions-db
+          property: connectionString
+      - key: PROCESSING_DELAY_SECONDS
+        value: "30"

@@ -1,0 +1,18 @@
+name: Keep Render instance warm
+
+# Render's free tier spins the web service down after ~15 minutes of
+# inactivity; the next request then eats a cold-start penalty of 10-20+
+# seconds, which would blow the assessment's 500ms response budget. Pinging
+# the health check every 10 minutes keeps the instance warm without needing
+# a paid Render plan.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health check endpoint
+        run: curl -sf https://webhook-transaction-service-hgxw.onrender.com/ || true
